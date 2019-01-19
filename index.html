@@ -134,7 +134,7 @@
           <h5 class="w3-center w3-padding-48"><span class="w3-tag w3-wide">OUR TERMS OF SERVICE</span></h5>
           <p>Here are our current terms of service:</p>
           <p>We serve you coffee and tea and other great products but if you act or do any of the following we will ask you to get lost:</p>
-          <p>
+          <p></p>
             <ul>
               <li>Don't be evil</li>
               <li>Don't act criminally</li>
@@ -143,7 +143,7 @@
               <li>Clean up after yourself</li>
               <li>Respect individuals of all shades and colors</li>
             </ul>
-          </p>
+          
         </div>
       </div>
 
@@ -261,6 +261,65 @@
       <p>sample template</p>
     </footer>
 
+    
+
+    <style>
+      xbee-script {
+        display:none;
+      }
+      xbee-cookie {
+        display:none;
+      }
+    </style>
+
+    <!-- 
+      The xbee-cookie is a declaration for cookies, you can add to DOM anywhere you wish to set cookies.
+      The cookie-kit will manage life cycle including removal.
+      Avoid Linefeeds or CR, this should be written in one line
+        <xbee-cookie category="user" name="supercookie">supercookievalue</xbee-cookie>
+
+      Attributes:
+        name => the name of the cookie you wish to set
+        category => one of the cookie categories: application, usage, statistics, advertising
+        days => optional: the number of days to set the cookie, if not provided will expire with session
+    -->   
+
+    <xbee-cookie category="usage" name="mycookie">this is a value of the cookie</xbee-cookie>
+
+    <!-- 
+      The xbee-script tag works like the HTML script but has two additional attributes. 
+      The tag content is Javascript that will be run later, the cookie can also load remote scripts with SRC attribute.
+
+      Additional Attributes:
+        action => on of "set" or "unset", you can provide clean up scripts with "unset" attribute 
+        category => one of the cookie categories: application, usage, statistics, advertising
+
+      YOU WILL NEED AN OPEN "<xbee-script>" AND CLOSE "</xbee-script>" TAG EVEN WHEN YOU ONLY USE SRC ATTRIBUTE
+    -->    
+
+    <!-- Google Analytics example with cookie kit -->
+    <xbee-script  category="application" action="set">
+        console.log("google cookie set script has been called");
+        (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+        m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+        })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+        
+        ga('create', 'UA-XXXXX-Y', 'auto');
+        ga('send', 'pageview');
+        
+    </xbee-script>
+    <!-- End Google Analytics -->
+
+
+    <xbee-script category="application" action="unset">
+        console.log("cookie unset script has been called: a cleanup script should be run here.");
+    </xbee-script>
+
+    <script category="blah">
+      console.log("here we go");
+    </script>
+
     <script>
       // Tabbed Menu
       function openMenu(evt, menuName) {
@@ -308,70 +367,274 @@
     </script>
 
     <script>
-        // these are helper functions to set and erase cookies
-        function setCookie(name, value, days) {
+
+
+      // These are function you can use with XcooBee Cookie Kit to manage cookie flow
+
+      /**
+       * Sets cookies
+       *
+       * @param {string} name the name of cookie
+       * @param {string} value the value of cookie
+       * @param {integer} days optional: the number of days to persist cookie, if not provided will become session cookie
+       */
+      function xckSetCookie(name, value, days) {
           var expires = "";
           if (days) {
-            var date = new Date();
-            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-            expires = "; expires=" + date.toUTCString();
+              var date = new Date();
+              date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+              expires = "; expires=" + date.toUTCString();
           }
           document.cookie = name + "=" + (value || "") + expires + "; path=/";
-        }
+      }
 
-        function getCookie(name) {
+
+      /**
+       * retrieve value of cookie
+       *
+       * @param {string} name the name of cookie
+       * @returns the value of cookie
+       */
+      function xckGetCookie(name) {
           var nameEQ = name + "=";
           var ca = document.cookie.split(';');
           for (var i = 0; i < ca.length; i++) {
-            var c = ca[i];
-            while (c.charAt(0) == ' ') c = c.substring(1, c.length);
-            if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+              var c = ca[i];
+              while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+              if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
           }
           return null;
-        }
+      }
 
-        function eraseCookie(name) {
+
+      /**
+       * deletes cookie with given name
+       *
+       * @param {string} name the name of cookie
+       */
+      function xckEraseCookie(name) {
           document.cookie = name + '=; Max-Age=-99999999;';
+      }
+
+      /**
+       * parse html encoded script directives
+       * @param {array} htmlData - string with script tags to be loaded
+       * @return {object} the fully parsed html elements in HtmlCollection
+       */
+      function xckParseHtml(htmlData) {
+          //parse encoded via text area
+          var txt = document.createElement("textarea");
+          txt.innerHTML = htmlData;
+
+          // now add this as html to our shadow doc
+          var el = document.createElement("html");
+          el.innerHTML = txt.innerText;
+          return el;
+      }
+
+
+      /**
+       * Load Javascript. Can load from remote file or code.
+       * @param {object} loadScripts - The HTMLCollection of script tags to be loaded
+       */
+      function xckLoadJs(loadScripts) {
+          var i = 0;
+          if (loadScripts.length > 0) {
+              for (i = 0; i < loadScripts.length; i++) {
+                  var item = loadScripts[i];
+                  var script = document.createElement("script");
+
+                  if (item.src === "") {
+                      script.text = item.text;
+                  } else {
+                      // load from file
+                      script.async = true; // we always load async
+                      script.src = item.src;
+                      script.onload = function () {
+                          console.log(`cookie script from ${item.src} is ready!`);
+                      };
+
+                      // other elements
+                      if (item.integrity !== "") {
+                          script.integrity = item.integrity;
+                      }
+                      if (item.crossOrigin !== "") {
+                          script.crossOrigin = item.crossOrigin;
+                      }
+                  }
+
+                  // now append to document for execution
+                  document.body.appendChild(script);
+              }
+          }
+      }
+
+      // scan for xcoobee-script tags and load them  
+
+      /**
+       * Scans document for HTML defined xbee-script tags and converts them into 
+       * scripts that will be loaded once user grants consent. Will also look for 
+       * unset scripts when user removes consent.
+       *
+       * @param {object} cookieTypes object with true/false for each user cookie type. Example Object { application: false, usage: true, statistics: false, advertising: false }
+       */
+      function xckHandleXbeeScriptTags(cookieTypes) {
+
+          let xbeCookieScripts = document.getElementsByTagName("xbee-script");
+          let i = 0;
+          let resolvedScripts = "";
+          if (xbeCookieScripts.length > 0) {
+              for (i = 0; i < xbeCookieScripts.length; i++) {
+                  try {
+                      let item = xbeCookieScripts[i];
+                      let script = item.outerHTML;
+                      let scriptAction = item.attributes["action"].value;
+                      let scriptCategory = item.attributes["category"].value;
+
+                      // for setting continue if user has responded, we are allowed the category, and action matches
+                      if ((XcooBee.kit.getConsentStatus() === "complete") && (scriptAction === "set") && (cookieTypes[scriptCategory])) {
+                          // replace xbee-script with script
+                          script = script.replace(/xbee-script/ig, "script");
+                          resolvedScripts = resolvedScripts + script;
+                      }
+
+                      // for un-setting getCookieTypes() has to be false we use separate condition for easier readability
+                      if ((XcooBee.kit.getConsentStatus() === "complete") && (scriptAction === "unset") && (!cookieTypes[scriptCategory])) {
+                          // replace xbee-script with script
+                          script = script.replace(/xbee-script/ig, "script");
+                          resolvedScripts = resolvedScripts + script;
+                      }
+
+
+                  } catch (error) {
+                      // error happened
+                      console.log("error during xckScanforScripts", error);
+
+                  }
+
+              }
+
+              // parse and load text scripts if we can find them
+              if (resolvedScripts !== "") {
+                  let runnableScripts = xckParseHtml(resolvedScripts);
+                  // load scripts presumably to set cookies              
+                  xckLoadJs(runnableScripts.getElementsByTagName("script"));
+              }
+
+              // TODO: save that we have loaded scripts during session so we do not reload
+
+
+          }
+
+      }
+
+      /**
+       * Scans document for HTML defined xbee-cookie tags and sets or removes cookies 
+       * once user grants consent. 
+       *
+       * @param {object} cookieTypes object with true/false for each user cookie category. Example Object { application: false, usage: true, statistics: false, advertising: false }
+       */
+      function xckHandleXbeeCookieTags(cookieTypes) {
+
+        let xbeCookieTags = document.getElementsByTagName("xbee-cookie");
+        let i = 0;
+        let resolvedScripts = "";
+        if (xbeCookieTags.length > 0) {
+            for (i = 0; i < xbeCookieTags.length; i++) {
+                try {
+                    let item = xbeCookieTags[i];
+                    let cookieValue = item.innerHTML;
+                    // we use the array notation since it will throw error  when we have missing required attributes
+                    let cookieName = item.attributes["name"].value;
+                    let cookieCategory = item.attributes["category"].value;
+                    let cookieDays = 0;
+                    // days is optional so we use this notation to retrieve it
+                    if (item.attributes.getNamedItem("days") !== null) {
+                        cookieDays = parseInt(item.attributes("days"));
+                    };
+
+                    // set this cookie
+                    if ((XcooBee.kit.getConsentStatus() === "complete") && (cookieTypes[cookieCategory])) {
+                        // set cookie
+                        xckSetCookie(cookieName,cookieValue,cookieDays);
+                    }
+
+                    // unset this cookie
+                    if ((XcooBee.kit.getConsentStatus() === "complete") && (!cookieTypes[cookieCategory])) {
+                        // erase cookie
+                        xckEraseCookie(cookieName);                    
+                    }
+
+
+                } catch (error) {
+                    // error happened
+                    console.log("error during xckHandleXbeeCookieTags", error);
+
+                }
+
+            }
+
         }
 
-        // This is the cookie handler
-        function myChFunction(cookieSettings) {
+      }
+
+
+
+  
+
+
+      // This is the cookie handler
+
+      /**
+       * Our main cookie handler. Make decision on all types of cookies to set or unset based on user interaction.
+       * Will be called by XcooBee cookie kit after user makes cookie decision or page is loaded with known decisions.
+       *
+       * @param {*} cookieSettings
+       */
+      function myChFunction(cookieSettings) {
           console.log("Cookie handler function has been called:", cookieSettings);
 
+          // call handler for scripts encoded in HTML as xbee-script
+          xckHandleXbeeScriptTags(cookieSettings);
+
+          // call handler for cookies encoded in HTML as "xbee-cookie"
+          xckHandleXbeeCookieTags(cookieSettings);
+
+          // call for program coded cookies
           if (cookieSettings.application) {
-            // set required cookies here
-            setCookie("myRequiredCookie", "this is a required cookie");
+              // set required cookies here
+              xckSetCookie("myRequiredCookie", "this is a required cookie");
           } else {
-            // remove required cookie here
-            eraseCookie("myRequiredCookie");
+              // remove required cookie here
+              xckEraseCookie("myRequiredCookie");
           };
 
           if (cookieSettings.usage) {
-            // set user personalization cookies here
-            setCookie("usage1", "green");
-            setCookie("usage2", "blue");
+              // set user personalization cookies here
+              xckSetCookie("usage1", "green");
+              xckSetCookie("usage2", "blue");
           } else {
-            // remove user personalization cookies here
-            eraseCookie("usage1");
-            eraseCookie("usage2");
+              // remove user personalization cookies here
+              xckEraseCookie("usage1");
+              xckEraseCookie("usage2");
           };
 
           if (cookieSettings.statistics) {
-            // set site statistics gathering cookies here
-            setCookie("statCookie", "counter");
+              // set site statistics gathering cookies here
+              xckSetCookie("statCookie", "counter");
           } else {
-            // remove site statistics gathering cookies here
-            eraseCookie("statCookie");
+              // remove site statistics gathering cookies here
+              xckEraseCookie("statCookie");
           };
 
           if (cookieSettings.advertising) {
-            // set advertising and marketing and tracking cookies here
-            setCookie("marketingCookie", "ads for all");
+              // set advertising and marketing and tracking cookies here
+              xckSetCookie("marketingCookie", "ads for all");
           } else {
-            // remove advertising and marketing and tracking cookies here
-            eraseCookie("marketingCookie");
+              // remove advertising and marketing and tracking cookies here
+              xckEraseCookie("marketingCookie");
           };
-        }
+      }     
     </script>
 
     <!-- COOKIE KIT SCRIPT END -->
