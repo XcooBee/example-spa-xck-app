@@ -275,7 +275,7 @@
     <!-- 
       The xbee-cookie is a declaration for cookies, you can add to DOM anywhere you wish to set cookies.
       The cookie-kit will manage life cycle including removal.
-      Avoid Linefeeds or CR, this should be written in one line
+      Avoid Linefeeds (CRLF). Tags should be written in one line
         <xbee-cookie category="user" name="supercookie">supercookievalue</xbee-cookie>
 
       Attributes:
@@ -315,10 +315,6 @@
     <xbee-script category="application" action="unset">
         console.log("cookie unset script has been called: a cleanup script should be run here.");
     </xbee-script>
-
-    <script category="blah">
-      console.log("here we go");
-    </script>
 
     <script>
       // Tabbed Menu
@@ -362,7 +358,7 @@
         requestDataTypes: ["application", "usage", "statistics"],
         termsUrl: "#terms",
         textMessage: "Welcome to our cafe site. We use these types of cookies. Please let us know if this is OK.",
-        testMode: true,
+        testMode: true
       });
     </script>
 
@@ -451,7 +447,9 @@
                       script.async = true; // we always load async
                       script.src = item.src;
                       script.onload = function () {
+                        if (XcooBee.kit.getParam("testMode")) {
                           console.log(`cookie script from ${item.src} is ready!`);
+                        };
                       };
 
                       // other elements
@@ -483,23 +481,24 @@
           let xbeCookieScripts = document.getElementsByTagName("xbee-script");
           let i = 0;
           let resolvedScripts = "";
-          if (xbeCookieScripts.length > 0) {
+          if (xbeCookieScripts.length > 0 && (XcooBee.kit.getConsentStatus() === "complete")) {
               for (i = 0; i < xbeCookieScripts.length; i++) {
+                  let item = xbeCookieScripts[i];
+                  let script = item.outerHTML;
                   try {
-                      let item = xbeCookieScripts[i];
-                      let script = item.outerHTML;
+                      // we use this notation to cause error when required attributes are not present                    
                       let scriptAction = item.attributes["action"].value;
                       let scriptCategory = item.attributes["category"].value;
 
                       // for setting continue if user has responded, we are allowed the category, and action matches
-                      if ((XcooBee.kit.getConsentStatus() === "complete") && (scriptAction === "set") && (cookieTypes[scriptCategory])) {
+                      if ( (scriptAction === "set") && (cookieTypes[scriptCategory]) ) {
                           // replace xbee-script with script
                           script = script.replace(/xbee-script/ig, "script");
                           resolvedScripts = resolvedScripts + script;
                       }
 
                       // for un-setting getCookieTypes() has to be false we use separate condition for easier readability
-                      if ((XcooBee.kit.getConsentStatus() === "complete") && (scriptAction === "unset") && (!cookieTypes[scriptCategory])) {
+                      if ( (scriptAction === "unset") && (!cookieTypes[scriptCategory]) ) {
                           // replace xbee-script with script
                           script = script.replace(/xbee-script/ig, "script");
                           resolvedScripts = resolvedScripts + script;
@@ -508,7 +507,10 @@
 
                   } catch (error) {
                       // error happened
-                      console.log("error during xckScanforScripts", error);
+                      console.log("tag caused error, please make sure you have supplied required attributes:", script.substr(0,40));
+                      if (XcooBee.kit.getParam("testMode")) {
+                        console.log(error);
+                      };
 
                   }
 
@@ -539,12 +541,14 @@
         let xbeCookieTags = document.getElementsByTagName("xbee-cookie");
         let i = 0;
         let resolvedScripts = "";
-        if (xbeCookieTags.length > 0) {
+        if (xbeCookieTags.length > 0 && (XcooBee.kit.getConsentStatus() === "complete")) {
             for (i = 0; i < xbeCookieTags.length; i++) {
+                let item = xbeCookieTags[i];
+                let cookieValue = item.innerHTML;    
+                let itemOuter = item.outerHTML;          
                 try {
-                    let item = xbeCookieTags[i];
-                    let cookieValue = item.innerHTML;
                     // we use the array notation since it will throw error  when we have missing required attributes
+                    cookieValue = cookieValue.replace(/\r?\n|\r/g,""); // remove CRLF
                     let cookieName = item.attributes["name"].value;
                     let cookieCategory = item.attributes["category"].value;
                     let cookieDays = 0;
@@ -553,22 +557,20 @@
                         cookieDays = parseInt(item.attributes("days"));
                     };
 
-                    // set this cookie
-                    if ((XcooBee.kit.getConsentStatus() === "complete") && (cookieTypes[cookieCategory])) {
+                    // set or erase this cookie based on whether category is allowed
+                    if (cookieTypes[cookieCategory]) {
                         // set cookie
                         xckSetCookie(cookieName,cookieValue,cookieDays);
-                    }
-
-                    // unset this cookie
-                    if ((XcooBee.kit.getConsentStatus() === "complete") && (!cookieTypes[cookieCategory])) {
+                    } else {
                         // erase cookie
                         xckEraseCookie(cookieName);                    
                     }
-
-
                 } catch (error) {
                     // error happened
-                    console.log("error during xckHandleXbeeCookieTags", error);
+                    console.log("error in cookie definition in tag:", itemOuter.substr(0,30));
+                    if (XcooBee.kit.getParam("testMode")) {
+                        console.log(error);
+                    };                    
 
                 }
 
