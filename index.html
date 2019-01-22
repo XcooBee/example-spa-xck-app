@@ -293,6 +293,13 @@
     -->   
 
     <xbee-cookie category="usage" name="mycookie">this is a value of the cookie</xbee-cookie>
+    <xbee-cookie category="application" name="myappcookie">great cookie</xbee-cookie>
+
+    
+    <!-- TODO 
+      - setManagedCookie
+      - analyze scripts  (need to identify script (by line?))
+    -->
 
     <!-- 
       The xbee-script tag works like the HTML script but has two additional attributes. 
@@ -375,6 +382,28 @@
 
       // These are function you can use with XcooBee Cookie Kit to manage cookie flow
 
+
+      // THIS SHOULD BE ADDED AS XcooBee.kit.setManagedCookie
+          // TODO: validate inputs: 
+          //    category is one of:  application, usage, statistics, advertising
+          //    days => optional: numeric value   
+          //    required: category, name, value   
+      function xckSetManagedCookie(category, name, value, days) {
+
+          let managedCookie = document.createElement("xbee-cookie");
+
+          // set elements
+          managedCookie.setAttribute("category", category);
+          managedCookie.setAttribute("name", name);
+          managedCookie.innerHTML = value;
+          if (typeof days !== "undefined") {
+            managedCookie.setAttribute("days", days);
+          }
+
+          // now add this as html to our DOM
+          document.body.appendChild(managedCookie);
+      }      
+
       /**
        * Sets cookies
        *
@@ -391,6 +420,7 @@
           }
           document.cookie = name + "=" + (value || "") + expires + "; path=/";
       }
+
 
 
       /**
@@ -410,6 +440,40 @@
           return null;
       }
 
+      /**
+       * retrieve array of cookie names
+       *
+       * @returns {array} array of cookie names
+       */
+      function xckGetCookieNames() {          
+          let ca = document.cookie.split(';');
+          let ra = [];
+          for (let i = 0; i < ca.length; i++) {
+              let c = ca[i].split("=")[0].trim();
+              ra.push(c);              
+          }
+          return ra;
+      }      
+
+
+
+      /**
+       * compare two arrays, return array of elements contained in newArray not part of oldArray
+       * @param {array} oldArray the initial array to compare against
+       * @param {array} newArray the second array. Only elements from this array will be returned
+       * @returns {array} array of elements only contained in newArray
+       */
+       function xckReturnNewElements(oldArray, newArray) {          
+          let ra = [];
+          for (let i = 0; i < newArray.length; i++) {
+              let item = newArray[i];
+              if (oldArray.indexOf(item)===-1) {
+                ra.push(item);  
+              }              
+          }
+          return ra;
+       }
+      
 
       /**
        * deletes cookie with given name
@@ -436,17 +500,80 @@
           return el;
       }
 
+      /**
+       * Removes cookies for categories without consent
+       *
+       * @param {Object} cookieTypes - The object collection of cookie categories consented by user
+       */
+      function xckClearCookies(cookieTypes) {
+        const entries = Object.entries(cookieTypes);
+        let i =0;
+
+        for (i = 0; i < entries.length; i++) {
+          let category = entries[i];
+          let storeName = "xck_cat_" + category[0];
+
+          // check whether we need to delete the category
+          if (!category[1]) {
+            let currentSetCookies = localStorage.getItem(storeName);
+            let i2 = 0;
+            if (currentSetCookies !== null) {
+              let cookies = currentSetCookies.split(",");
+              // iterate and delete
+              for (i2=0; i2 < cookies.length; i2++) {
+                xckEraseCookie(cookies[i2]);
+              }
+              // delete local storage
+              localStorage.removeItem(storeName);
+            }
+          }
+          
+        }
+
+
+      }
+
+      /**
+       * Updates our local store with cookies that have been set for a given category so far
+       * @param {array} aInitialCookies - The array of cookies that were set before script was run
+       * @param {string} category - cookie category related to this load
+       */
+      function xckSaveCookieState(aInitialCookies,category) {
+        let aNewCookies = [];
+        let aAddedCookies = [];
+
+        aNewCookies = xckGetCookieNames();
+        aAddedCookies = xckReturnNewElements(aInitialCookies,aNewCookies);
+        // check what cookies are set now and save this to our local store
+        if (typeof category !== "undefined") {
+          //load and save the cookies set for this category
+          let storeName = "xck_cat_" + category;
+          let currentCategoryCookies = localStorage.getItem(storeName);
+          if (aAddedCookies.length > 0 ) {
+            if (currentCategoryCookies === null) {
+              currentCategoryCookies = aAddedCookies.join();
+            } else {
+              currentCategoryCookies = currentCategoryCookies + "," + aAddedCookies.join();
+            }
+            localStorage.setItem(storeName, currentCategoryCookies);
+          }
+        }
+      }
 
       /**
        * Load Javascript. Can load from remote file or code.
        * @param {object} loadScripts - The HTMLCollection of script tags to be loaded
+       * @param {string} category - cookie category related to this load
        */
-      function xckLoadJs(loadScripts) {
-          var i = 0;
+      function xckLoadJs(loadScripts, category) {
+          let i = 0;
+          let aInitialCookies = xckGetCookieNames();
+
+
           if (loadScripts.length > 0) {
               for (i = 0; i < loadScripts.length; i++) {
-                  var item = loadScripts[i];
-                  var script = document.createElement("script");
+                  let item = loadScripts[i];
+                  let script = document.createElement("script");
 
                   if (item.src === "") {
                       script.text = item.text;
@@ -454,11 +581,13 @@
                       // load from file
                       script.async = true; // we always load async
                       script.src = item.src;
+                      // after script is loaded we need to process the cookie state
                       script.onload = function () {
-                        if (XcooBee.kit.getParam("testMode")) {
+                        if (XcooBee.kit.getParam("testMode") && (item.src !== "")) {
                           console.log(`cookie script from ${item.src} is ready!`);
                         };
-                      };
+                        xckSaveCookieState(aInitialCookies, category);
+                      };                      
 
                       // other elements
                       if (item.integrity !== "") {
@@ -469,8 +598,11 @@
                       }
                   }
 
-                  // now append to document for execution
+                  // now append to document for execution and save cookie state
                   document.body.appendChild(script);
+                  if (item.src === "") {
+                    xckSaveCookieState(aInitialCookies, category);
+                  }
               }
           }
       }
@@ -493,6 +625,7 @@
               for (i = 0; i < xbeCookieScripts.length; i++) {
                   let item = xbeCookieScripts[i];
                   let script = item.outerHTML;
+                  resolvedScripts = "";
                   try {
                       // we use this notation to cause error when required attributes are not present                    
                       let scriptAction = item.attributes["action"].value;
@@ -512,6 +645,12 @@
                           resolvedScripts = resolvedScripts + script;
                       }
 
+                      // parse and load text scripts if we can find them
+                      if (resolvedScripts !== "") {
+                          let runnableScripts = xckParseHtml(resolvedScripts);
+                          // load scripts presumably to set cookies              
+                          xckLoadJs(runnableScripts.getElementsByTagName("script"),scriptCategory);
+                      }
 
                   } catch (error) {
                       // error happened
@@ -524,12 +663,7 @@
 
               }
 
-              // parse and load text scripts if we can find them
-              if (resolvedScripts !== "") {
-                  let runnableScripts = xckParseHtml(resolvedScripts);
-                  // load scripts presumably to set cookies              
-                  xckLoadJs(runnableScripts.getElementsByTagName("script"));
-              }
+
 
               // TODO: save that we have loaded scripts during session so we do not reload
 
@@ -603,6 +737,9 @@
        */
       function myChFunction(cookieSettings) {
           console.log("Cookie handler function has been called:", cookieSettings);
+
+          // clear all cookies crated by scripts that have no longer consent from user
+          xckClearCookies(cookieSettings);
 
           // call handler for scripts encoded in HTML as xbee-script
           xckHandleXbeeScriptTags(cookieSettings);
