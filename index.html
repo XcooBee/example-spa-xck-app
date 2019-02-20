@@ -316,7 +316,7 @@
     -->    
 
     <!-- Google Analytics example with cookie kit -->
-    <xbee-script  category="application" action="set">
+    <xbee-script  category="statistics" action="set">
         console.log("google cookie set script has been called");
         (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
         (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
@@ -330,7 +330,7 @@
     <!-- End Google Analytics -->
 
 
-    <xbee-script category="application" action="unset">
+    <xbee-script category="statistics" action="unset">
         console.log("cookie unset script has been called: a cleanup script should be run here.");
     </xbee-script>
 
